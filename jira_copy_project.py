@@ -486,7 +486,7 @@ if __name__ == "__main__":
     j_new_param = (secret_new['server'], secret_new['user'], secret_new['pass'])
 
     # the project name shall be given as external parameter
-    j_project = "PRO"
+    j_project = "DIT"
     # perform jira connection
     j_old = jconnect(j_old_param)
     # perform jira connection
@@ -499,6 +499,6 @@ if __name__ == "__main__":
     issues_old, issues_new, not_issues  = copy_issues(j_old, j_new, j_project, start=0)
     # iterate along the issues in the old project and copy comments attachment and change status in the
     # new jira issues
-    copy_issueattribs(jira_in, jira_out, issues_old)
+    copy_issueattribs(j_old, j_new, issues_old)
     
     print "Copy operation terminated, exit"
