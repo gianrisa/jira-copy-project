@@ -384,6 +384,29 @@ def copy_issues(jira_in, jira_out, project, issue_max_key, issues_old, start=0):
             print "Skiping issue      : %s-%s"%(project,i)
 
 @timeit
+def custom_isseue_comments(issue_in):
+    """ This method can be extended from the end user in order to include in the issue comment
+        the old issue unmapped fields
+    """
+    comment = """
+            original field : assignee       :  %(assignee)s      
+            original field : created        :  %(created)s       
+            original field : creator        :  %(creator)s       
+            original field : duedate        :  %(duedate)s       
+            original field : reporter       :  %(reporter)s      
+            original field : resolution     :  %(resolution)s    
+            original field : resolutiondate :  %(resolutiondate)s
+            original field : status         :  %(status)s        
+            original field : updated        :  %(updated)s       
+              """% {'assignee' : issue_in.fields.assignee.name,  'created'  :issue_in.fields.created, 
+                    'creator'  : issue_in.fields.creator.name,  'duedate'   :issue_in.fields.duedate,
+                    'reporter' : issue_in.fields.reporter.name, 'resolution':issue_in.fields.resolution, 
+                    'resolutiondate' : issue_in.fields.resolutiondate, 'status': issue_in.fields.status.name,
+                    'updated'  : issue_in.fields.updated}
+    return str(comment)
+
+
+@timeit
 def copy_comments(jira_out, issue_in, issue_out):
     """ This is the helper method to copy the comments from jira_out to
         jira_out, related to the project, copy comments inclue only the
@@ -394,9 +417,12 @@ def copy_comments(jira_out, issue_in, issue_out):
     # issue_in.update()
     try:
         issue_out.update()
+        comments = [custom_isseue_comments(issue_in)]
         # get the comments from the in issue then copies them to the other issue in the other jira instance
-        comments = ["%s added by %s"%(comment.body, comment.author.emailAddress) for comment in issue_in.fields.comment.comments]
+        issue_comments = ["%s added by %s"%(comment.body, comment.author.emailAddress) for comment in issue_in.fields.comment.comments]
         # Add a comment to the issue.
+        commnets.extned(issue_comments)
+
     except Exception as e:
         # no comment
         print "Could not get comments :", issue_in.key, e
