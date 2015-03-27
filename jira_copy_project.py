@@ -491,7 +491,7 @@ def copy_issueattribs(jira_in, jira_out, green_out, issues_in, options):
         issuestatus and issuelinks.
     """
     for i in issues_in:
-
+        # [] 
         i_old = jira_in.issue(i.key)
         i_new = jira_out.issue(i_old.key)  
         print "Copy issue attributes:", i_old.key
