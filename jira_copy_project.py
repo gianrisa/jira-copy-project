@@ -7,6 +7,7 @@ import time
 import pprint
 
 from jira.client import JIRA
+from jira.client import GreenHopper
 from optparse import OptionParser
 from secret_file import secret_new, secret_old
                                                        
@@ -343,21 +344,14 @@ def copy_versions(jira_in, jira_out, project):
     return vers_c
 
 @timeit
-def copy_issues(jira_in, jira_out, project, start=0):
+def copy_issues(jira_in, jira_out, project, issue_max_key, issues_old, start=0):
     """ This method get the max issues and the issue list - issue contains the issue 
         pointer to the old jira to be migrated like .. links .. attachment ..
         status.. this is pretty big anyway 
     """
-    issue_max_key =  jissue_get_last(jira_in, project)    
-    # get all the issues in the project pretty expensive operation, this will take a while
-    issues_old = jissue_get_chunked(jira_in, project, issue_max_key)
+
     # list holder for the issues that need to be created in jira_new empty vector
     issues_list = ['']*(issue_max_key)
-    # list holder for the new created issues
-    issues_list_c = []
-    # list holder for issue to be deleted
-    issues_list_r = []
-    # place the value in the right position
     
     for issue in issues_old:
         issues_list[int(issue.key.split("-")[1])-1]=issue
@@ -383,14 +377,11 @@ def copy_issues(jira_in, jira_out, project, start=0):
                 # let's create a virtual issue key will be stored in a list and later on
                 # will be used to delete all the dummy unused issues
                 print "Created dummy issue     : %s-%s"%(project,i+1)
-                issues_list_r.append(issue)
                 issue_dict = eval(jissue_field_prepare_dummy_s(project))
             # here finally we create the issue and we place it in a list
-
-            issues_list_c.append(jira_out.create_issue(fields=issue_dict, prefetch=True))
+            issue_created = jira_out.create_issue(fields=issue_dict, prefetch=True)
         else:
             print "Skiping issue      : %s-%s"%(project,i)
-    return issues_old, issues_list_c, issues_list_r
 
 @timeit
 def copy_comments(jira_out, issue_in, issue_out):
@@ -466,6 +457,16 @@ def copy_issuelinks(jira_in, jira_out, issue_in):
         except Exception as e:
             print "Link issue not copyied :", jira_in.issue_link(i.id).inwardIssue.key, \
                                               jira_in.issue_link(i.id).outwardIssue.key, e
+@timeit
+def copy_epiclink(green_in, green_out, issue_in):
+    try:
+        if hasattr(issue_in.fields, 'customfield_10811') and issue_in.fields.customfield_10811:
+            epicLink = str(issue_in.fields.customfield_10811)
+            issuesToAdd = [str(issue_in.fields.key)]
+            jira_out.add_issues_to_epic(epicLink, issuesToAdd)          
+    except:
+        print "Epic Link issue not copyied :", issue_in.key
+
 
 @timeit                                              
 def copy_issuestatus(jira_in, jira_out, issue_in):
@@ -484,28 +485,41 @@ def copy_issuestatus(jira_in, jira_out, issue_in):
     except Exception as e:
         print "Cannot change issue status :", e
 
-
 @timeit
-def copy_issueattribs(jira_in, jira_out, issues_in):
+def copy_issueattribs(jira_in, jira_out, green_out, issues_in, options):
     """ This method is used to copy issue attributes, comments, attachments
         issuestatus and issuelinks.
     """
-
     for i in issues_in:
 
         i_old = jira_in.issue(i.key)
         i_new = jira_out.issue(i_old.key)  
         print "Copy issue attributes:", i_old.key
 
-        copy_comments(jira_out, i_old, i_new)
-        copy_attachment(jira_in, jira_out, i_old)
-        copy_issuelinks(jira_in, jira_out, i_old)
-        copy_issuestatus(jira_in, jira_out, i_old)
+        if options.issuecomm:   copy_comments(jira_out, i_old, i_new)
+        if options.issueattach: copy_attachment(jira_in, jira_out, i_old)
+        if options.issuelinks:  copy_issuelinks(jira_in, jira_out, i_old)
+        if options.issuelinks:  copy_epiclink(jira_in, green_out, i_old)
+        if options.issuestatus: copy_issuestatus(jira_in, jira_out, i_old)
 
+
+# 88        88 88888888888 88          88888888ba  88888888888 88888888ba   ad88888ba   
+# 88        88 88          88          88      "8b 88          88      "8b d8"     "8b  
+# 88        88 88          88          88      ,8P 88          88      ,8P Y8,          
+# 88aaaaaaaa88 88aaaaa     88          88aaaaaa8P' 88aaaaa     88aaaaaa8P' `Y8aaaaa,    
+# 88""""""""88 88"""""     88          88""""""'   88"""""     88""""88'     `"""""8b,  
+# 88        88 88          88          88          88          88    `8b           `8b  
+# 88        88 88          88          88          88          88     `8b  Y8a     a8P  
+# 88        88 88888888888 88888888888 88          88888888888 88      `8b  "Y88888P"    
 
 def jconnect(jira_param):
     """ This is the methos used as jira connector """
     jcon = JIRA(options={'server': jira_param[0]},basic_auth=(jira_param[1], jira_param[2]))
+    return jcon
+
+def jgreencon(jira_param):
+    """ This is the methos used as jira connector """
+    jcon = GreenHopper(options={'server': jira_param[0]},basic_auth=(jira_param[1], jira_param[2]))
     return jcon
 
 def jissue_query(jinstance, jproj, startAt=0, maxResults=10):
@@ -535,6 +549,18 @@ def jissue_get_chunked(jira_in, project, issue_max_count, chunks=100):
     result.extend(jissue_query(jira_in, project, issue_max_count-rest, rest))
     return result
 
+@timeit
+def jissue_prepare(jira_in, project):
+    """ This method gets the total number of issues and the relative list
+        it returns two parameters first issue list second max count
+    """
+    # get the max issue number max key
+    issue_max_key =  jissue_get_last(jira_in, project)    
+    # get all the issues in the project pretty expensive operation, this will take a while
+    issues_old = jissue_get_chunked(jira_in, project, issue_max_key)
+    # return the issues list 
+    return issues_old, issue_max_key
+
 def jissue_field_parser(jira_in, issue_in):
     parsed_custom = []
     parsed_system = []
@@ -551,6 +577,16 @@ def jissue_field_parser(jira_in, issue_in):
         print "Exception occurred :", e
         return 0, 0
 
+
+# 88b           d88        db        88 888b      88  
+# 888b         d888       d88b       88 8888b     88  
+# 88`8b       d8'88      d8'`8b      88 88 `8b    88  
+# 88 `8b     d8' 88     d8'  `8b     88 88  `8b   88  
+# 88  `8b   d8'  88    d8YaaaaY8b    88 88   `8b  88  
+# 88   `8b d8'   88   d8""""""""8b   88 88    `8b 88  
+# 88    `888'    88  d8'        `8b  88 88     `8888  
+# 88     `8'     88 d8'          `8b 88 88      `888  
+
 # the main, combine all together, and get the needed parameters
 # from option parser
 def main():
@@ -559,17 +595,29 @@ def main():
     parser.add_option("-f", "--full", dest="full",
                       action="store_true", help="all options enabled", default=False)
 
-    parser.add_option("--cv", "--comp-version",
-                      action="store_true", dest="compvers", default=False)
+    parser.add_option("--pc", "--components", help="copy project components",
+                      action="store_true", dest="components", default=False)
 
-    parser.add_option("-a", "--attributes", help="copy issues attributes",
-                      action="store_true", dest="attributes", default=False)
+    parser.add_option("--pv", "--versions", help="copy project versions",
+                      action="store_true", dest="versions", default=False)   
 
-    parser.add_option("--di", "--disable-issues", help="copy issues",
-                      action="store_false", dest="issues", default=True)
+    parser.add_option("--il", "--issue-link", help="copy issues links",
+                      action="store_true", dest="issuelinks", default=False)
 
-    parser.add_option("-s", "--start", dest="start", default=0, type="int", 
-                      help="issue to start copy from")
+    parser.add_option("--ic", "--issue-comm", help="copy issues comments",
+                      action="store_true", dest="issuecomm", default=False)
+
+    parser.add_option("--ia", "--issue-attach", help="copy issues attachments",
+                      action="store_true", dest="issueattach", default=False)
+
+    parser.add_option("--is", "--issue-satus", help="copy issues status",
+                      action="store_true", dest="issuestatus", default=False) 
+
+    parser.add_option("--i", "--issues", help="copy issues",
+                      action="store_true", dest="issues", default=False)
+
+    parser.add_option("-b", "--begin", dest="start", default=0, type="int", 
+                      help="issue to begin copy from")
 
     parser.add_option("-z", "--analyze",  dest="analyze", type="string",
                       help="issue customfield analyze")
@@ -593,6 +641,10 @@ def main():
     j_old = jconnect(j_old_param)
     # perform jira connection
     j_new = jconnect(j_new_param)
+    # perform jira green hopper connection 
+    j_green = jgreencon(j_new_param)
+    # fetch the data this operation needs to be done before to start any kind of copy
+    issue_old, issue_max_key = jissue_prepare(j_old, j_project)
 
     print banner("JIRA IN SERVER CONNECTED")
     pprint.pprint(j_old.server_info(), indent=3)
@@ -600,22 +652,26 @@ def main():
     print banner("JIRA OUT SERVER CONNECTED")
     pprint.pprint(j_new.server_info(), indent=3)
 
-    print banner("COMPONENTS & VERSIONS")
-    if options.full or options.compvers:
-        # precondition prepare the versions and the components if any copy from old to new
-        proj_versions   = copy_versions(j_old, j_new, j_project)
+    print banner("COPY COMPONENTS")
+    if options.components:
+        # precondition prepare the components if any copy from old to new
         proj_componente = copy_components(j_old, j_new, j_project)
 
-    print banner("ALL ISSUES")
-    if options.full or options.issues:
+    print banner("COPY VERSIONS")
+        # precondition prepare the versions if any copy from old to new
+    if options.versions:
+        proj_versions   = copy_versions(j_old, j_new, j_project)
+
+    print banner("COPY ISSUES")
+    if options.issues:
         # iterate along the issues and copy the issues to the new jira
-        issues_old, issues_new, not_issues  = copy_issues(j_old, j_new, j_project, options.start)
+        copy_issues(j_old, j_new, j_project, issue_max_key, issues_old, options.start)
     
-    print banner("ALL ATTRIBUTES")
-    if options.full or options.attributes:
+    print banner("COPY ATTRIBUTES")
+    if options.issuestatus or options.issuelinks or options.issuecomm or options.issueattach:
         # iterate along the issues in the old project and copy comments attachment links and change 
         # the issues status in the new jira
-        copy_issueattribs(j_old, j_new, issues_old)
+        copy_issueattribs(j_old, j_new, j_green, issues_old, options)
 
     print banner("ISSUE ANALYZER")
     if options.analyze:
