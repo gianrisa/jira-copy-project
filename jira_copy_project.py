@@ -9,7 +9,7 @@ import pprint
 from jira.client import JIRA
 from jira.client import GreenHopper
 from optparse import OptionParser
-from secret_file import secret_new, secret_old
+from jira_secrets import secret_new, secret_old
          
 # 88b           d88        db        88888888ba   ad88888ba
 # 888b         d888       d88b       88      "8b d8"     "8b
