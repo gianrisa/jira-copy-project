@@ -43,6 +43,16 @@ linktype_map =  {
                 }
 
 issuetype_map = {
+                  'Question'             : 'Task',
+                  'New Feature'          : 'Improvement',
+                  'Design Issue'         : 'Defect',
+                  'Issue'                : 'Defect',
+                  'Other'                : 'Task',
+                  'Change Request'       : 'Improvement',
+                  'Production Bug'       : 'Defect',
+                  'Release'              : 'Task',
+                  'Story'                : 'User Story',
+                  'Decision'             : 'Task',
                   'Data Quality'         : 'Defect',
                   'Performance'          : 'Defect',
                   'Change Request'       : 'Improvement',
@@ -53,11 +63,13 @@ issuetype_map = {
                   'Bug'                  : 'Defect',
                   'Technical Story'      : 'User Story',
                   'Technical task'       : 'Sub-task',
+                  'Use Case'             : 'User Story',
                   'Story'                : 'User Story',
                   'Epic'                 : 'EPIC',
                   'Improvement'          : 'Improvement',
                   'Change Request'       : 'Improvement',
                   'Task'                 : 'Task',
+                  'Deployment Task'      : 'Task',
                   'Missing Funtionality' : 'Improvement',
                   'Issue'                : 'Defect',
                   'Scope Statement'      : 'Improvement'
@@ -86,7 +98,7 @@ def jissue_field_prepare_dummy_s(project, inst):
                   'reporter'         : {'name':'risalgia'},
                   'summary'          : 'DUMMY_REMOVE_ME',
                   '%(phase)s'        : {'value' : 'System Integration Test'},
-                  '%(severity)s'     : {'value' : 'Major'}}""" % {'project':project, 'phase':__phase(inst), 'severity':__severity(inst)}
+                  '%(severity)s'     : {'value' : 'Major'}}""" % {'project':project, 'phase':__phase__(inst), 'severity':__severity__(inst)}
     return fields
 
 def jissue_field_prepare_dummy_f(project, inst):
@@ -109,7 +121,7 @@ def jissue_field_prepare_dummy_f(project, inst):
                   'reporter'         : {'name':'risalgia'},
                   'summary'          : 'DUMMY_REMOVE_ME',
                   '%(phase)s'        : {'value' : 'System Integration Test'},
-                  '%(severity)s'     : {'value' : 'Major'}}""" % {'project':project, 'phase':__phase(inst), 'severity':__severity(inst)}
+                  '%(severity)s'     : {'value' : 'Major'}}""" % {'project':project, 'phase':__phase__(inst), 'severity':__severity__(inst)}
     return fields
 
 def jissue_field_prepare_mapped(issue, jira, proj, inst):
@@ -130,10 +142,10 @@ def jissue_field_prepare_mapped(issue, jira, proj, inst):
                   'project'          : project(issue),
                   'reporter'         : reporter(issue, jira, proj),
                   'summary'          : summary(issue),
-                  __epic(inst)       : epic(issue),
-                  __phase(inst)      : phase(issue),
-                  __severity(inst)   : severity(issue),
-                  __rfctcnu(inst)    : rfctcnu(issue)  }
+                  __epic__(inst)     : epic(issue),
+                  __phase__(inst)    : phase(issue),
+                  __severity__(inst) : severity(issue),
+                  __rfctcnu__(inst)  : rfctcnu(issue)  }
     # in case the fields are empty clean it up
     tmp = {k:v for k,v in fields_tmp.items() if v}
     ## pprint.pprint(tmp, indent=3)
@@ -171,12 +183,15 @@ def description(issue):
         return "Empty description"
 
 def epic(issue):
-    if hasattr(issue.fields, 'customfield_10814'):
-        return str(clean(issue.fields.customfield_10814))
+    if hasattr(issue.fields, 'customfield_10814') :
+        if issue.fields.customfield_10814 :
+            return str(clean(issue.fields.customfield_10814))
+        else:
+            return str(clean(issue.key))
     else:
         return []
 # this are the method is to switch between the two jira instances.
-def __epic(jinst):
+def __epic__(jinst):
     if jinst:
         __epic = 'customfield_10014' # instance 
     else:
@@ -256,7 +271,7 @@ def phase(issue):
     else:
         return []
 # this are the method is to switch between the two jira instances.
-def __phase(jinst):
+def __phase__(jinst):
     if jinst:
         __phase = 'customfield_10001' # instance 
     else:
@@ -273,8 +288,8 @@ def severity(issue):
     else:
         return []
 # this are the method is to switch between the two jira instances.
-def __severity(jinst):
-    if __severity:
+def __severity__(jinst):
+    if jinst:
         __severity = 'customfield_10022' # instance 
     else:
         __severity = 'customfield_10303' # pre instance 
@@ -286,8 +301,8 @@ def rfctcnu(issue):
     else:
         return []
 # this are the method is to switch between the two jira instances.
-def __rfctcnu(jinst):
-    if __rfctcnu:
+def __rfctcnu__(jinst):
+    if jinst:
         __rfctcnu = 'customfield_10002' # instance 
     else:
         __rfctcnu = 'customfield_10203' # pre instance 
@@ -396,7 +411,6 @@ def copy_issues(jira_in, jira_out, project, issue_max_key, issues_old, inst, sta
 
                 except Exception as e:
                     print "Emergency issue created : %s-%s"%(project,i+1), e
-                    issues_list_r.append(issue)
                     issue_dict = eval(jissue_field_prepare_dummy_s(project, inst))
             else:
                 # someone deleted that issue we need to create one empty minimum required
@@ -446,7 +460,7 @@ def copy_comments(jira_out, issue_in, issue_out):
         # get the comments from the in issue then copies them to the other issue in the other jira instance
         issue_comments = ["%s added by %s"%(comment.body, comment.author.emailAddress) for comment in issue_in.fields.comment.comments]
         # Add a comment to the issue.
-        commnets.extned(issue_comments)
+        comments.extend(issue_comments)
 
     except Exception as e:
         # no comment
@@ -460,7 +474,7 @@ def get_attachments(jira_in, issue_in):
     """ This method is the helper to get the attachments store them
         in temp directory and returns a list of filename to be uploaded
     """
-    path = r"C:\TEMP\%s"
+    path = r"TEMP/%s"
     # remember to update the issue before touch it !!!
     # issue_in.update()
     filelist = []
@@ -511,8 +525,8 @@ def copy_issuelinks(jira_in, jira_out, issue_in):
 @timeit
 def copy_epiclink(green_in, green_out, issue_in):
     try:
-        if hasattr(issue_in.fields, 'customfield_10811') and issue_in.fields.customfield_10811: #source epic link field 
-            epicLink = str(issue_in.fields.customfield_10811) # source epic link field 
+        if hasattr(issue_in.fields, 'customfield_10814') and issue_in.fields.customfield_10814: #source epic link field 
+            epicLink = str(issue_in.fields.customfield_10814) # source epic link field 
             issuesToAdd = [str(issue_in.fields.key)]
             jira_out.add_issues_to_epic(epicLink, issuesToAdd)
     except:
@@ -541,17 +555,19 @@ def copy_issueattribs(jira_in, jira_out, green_out, issues_in, options):
     """ This method is used to copy issue attributes, comments, attachments
         issuestatus and issuelinks.
     """
+    start = options.start
     for i in issues_in:
         # []
-        i_old = jira_in.issue(i.key)
-        i_new = jira_out.issue(i_old.key)
-        print "Copy issue attributes:", i_old.key
+        if i >= start: 
+            i_old = jira_in.issue(i.key)
+            i_new = jira_out.issue(i_old.key)
+            print "Copy issue attributes:", i_old.key
 
-        if options.issuecomm:   copy_comments(jira_out, i_old, i_new)
-        if options.issueattach: copy_attachment(jira_in, jira_out, i_old)
-        if options.issuelinks:  copy_issuelinks(jira_in, jira_out, i_old)
-        if options.issuelinks:  copy_epiclink(jira_in, green_out, i_old)
-        if options.issuestatus: copy_issuestatus(jira_in, jira_out, i_old)
+            if options.issuecomm:   copy_comments(jira_out, i_old, i_new)
+            if options.issueattach: copy_attachment(jira_in, jira_out, i_old)
+            if options.issuelinks:  copy_issuelinks(jira_in, jira_out, i_old)
+            if options.issuelinks:  copy_epiclink(jira_in, green_out, i_old)
+            if options.issuestatus: copy_issuestatus(jira_in, jira_out, i_old)
 
 
 # 88        88 88888888888 88          88888888ba  88888888888 88888888ba   ad88888ba
@@ -641,10 +657,8 @@ def jissue_field_parser(jira_in, issue_in):
 # the main, combine all together, and get the needed parameters
 # from option parser
 def main():
-    usage = "usage: %prog [options] arg"
+    usage = "usage: %prog <project_key> [options]"
     parser = OptionParser(usage)
-    parser.add_option("-f", "--full", dest="full",
-                      action="store_true", help="all options enabled", default=False)
 
     parser.add_option("--pc", "--components", help="copy project components",
                       action="store_true", dest="components", default=False)
@@ -670,7 +684,7 @@ def main():
     parser.add_option("-b", "--begin", dest="start", default=0, type="int",
                       help="issue to begin copy from")
 
-    parser.add_option("-z", "--analyze",  dest="analyze", type="string",
+    parser.add_option("-z", "--analyze", dest="analyze", type="string",
                       help="issue customfield analyze")
 
     parser.add_option("-P", "--production",  help="copy to production",
@@ -698,7 +712,7 @@ def main():
     # perform jira green hopper connection
     j_green = jgreencon(j_new_param)
     # fetch the data this operation needs to be done before to start any kind of copy
-    issue_old, issue_max_key = jissue_prepare(j_old, j_project)
+    issues_old, issue_max_key = jissue_prepare(j_old, j_project)
 
     print banner("JIRA IN SERVER CONNECTED")
     pprint.pprint(j_old.server_info(), indent=3)
@@ -719,7 +733,7 @@ def main():
     print banner("COPY ISSUES")
     if options.issues:
         # iterate along the issues and copy the issues to the new jira
-        copy_issues(j_old, j_new, j_project, issue_max_key, issues_old, inst, options.start)
+        copy_issues(j_old, j_new, j_project, issue_max_key, issues_old, options.inst, options.start)
     
     print banner("COPY ATTRIBUTES")
     if options.issuestatus or options.issuelinks or options.issuecomm or options.issueattach:
@@ -729,8 +743,11 @@ def main():
 
     print banner("ISSUE ANALYZER")
     if options.analyze:
+        if options.inst:
+            result = jissue_field_parser(j_old, options.analyze)
+        else:
+            result = jissue_field_parser(j_new, options.analyze)
         # this helps the user to understand which fields are availables in the wished issue.
-        result = jissue_field_parser(j_old, options.analyze)
         # print the SYSTEM FIELDS
         print banner("SYSTEM FIELDS")
         pprint.pprint(result[0], indent=3)
