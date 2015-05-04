@@ -63,7 +63,9 @@ issuetype_map = {
                   'Bug'                  : 'Defect',
                   'Technical Story'      : 'User Story',
                   'Technical task'       : 'Sub-task',
+                  'Technical Task'       : 'Sub-task',
                   'Use Case'             : 'User Story',
+                  'User Story'           : 'User Story',
                   'Story'                : 'User Story',
                   'Epic'                 : 'EPIC',
                   'Improvement'          : 'Improvement',
@@ -419,7 +421,14 @@ def copy_issues(jira_in, jira_out, project, issue_max_key, issues_old, inst, sta
                 print "Created dummy issue     : %s-%s"%(project,i+1)
                 issue_dict = eval(jissue_field_prepare_dummy_s(project, inst))
             # here finally we create the issue and we place it in a list
-            issue_created = jira_out.create_issue(fields=issue_dict, prefetch=True)
+            try:
+                issue_created = jira_out.create_issue(fields=issue_dict, prefetch=True)
+            except Exception as e:
+                # emergency issues are created for particular cases, issue wrong numbering
+                # issue assigne before the requested is created
+                print "Emergency issue created : %s-%s"%(project,i+1), e
+                issue_dict = eval(jissue_field_prepare_dummy_s(project, inst))
+                issue_created = jira_out.create_issue(fields=issue_dict, prefetch=True)
         else:
             print "Skiping issue      : %s-%s"%(project,i)
 
@@ -525,10 +534,10 @@ def copy_issuelinks(jira_in, jira_out, issue_in):
 @timeit
 def copy_epiclink(green_in, green_out, issue_in):
     try:
-        if hasattr(issue_in.fields, 'customfield_10814') and issue_in.fields.customfield_10814: #source epic link field 
-            epicLink = str(issue_in.fields.customfield_10814) # source epic link field 
-            issuesToAdd = [str(issue_in.fields.key)]
-            jira_out.add_issues_to_epic(epicLink, issuesToAdd)
+        if hasattr(issue_in.fields, 'customfield_10811') and issue_in.fields.customfield_10811: #source epic link field 
+            epicLink = str(issue_in.fields.customfield_10811) # source epic link field 
+            issuesToAdd = [str(issue_in.key)]
+            green_out.add_issues_to_epic(epicLink, issuesToAdd)
     except:
         print "Epic Link issue not copyied :", issue_in.key
 
