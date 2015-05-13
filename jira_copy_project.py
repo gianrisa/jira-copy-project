@@ -433,6 +433,19 @@ def copy_issues(jira_in, jira_out, project, issue_max_key, issues_old, inst, sta
             print "Skiping issue      : %s-%s"%(project,i)
 
 @timeit
+def custom_field_check(issue_in, attrib):
+  """ This method allows the user to get in the comments customfiled that are not common
+      to all the project, in case the customfiled does not existe the method returns an
+      empty string.
+  """
+  if hasattr(issue_in.fields, attrib):
+    return str(clean(eval('issue.fields.%s'%str(attrib))))
+  else:
+    return str("")
+
+
+
+@timeit
 def custom_isseue_comments(issue_in):
     """ This method can be extended from the end user in order to include in the issue comment
         the old issue unmapped fields
@@ -447,11 +460,23 @@ def custom_isseue_comments(issue_in):
               original field : resolutiondate :  %(resolutiondate)s
               original field : status         :  %(status)s
               original field : updated        :  %(updated)s
-              """% {'assignee' : str(issue_in.fields.assignee.name),  'created'  :str(issue_in.fields.created),
-                    'creator'  : str(issue_in.fields.creator.name),  'duedate'   :str(issue_in.fields.duedate),
-                    'reporter' : str(issue_in.fields.reporter.name), 'resolution':str(issue_in.fields.resolution),
-                    'resolutiondate' : str(issue_in.fields.resolutiondate), 'status': str(issue_in.fields.status.name),
-                    'updated'  : issue_in.fields.updated}
+              original field : comment        :  %(comment)s
+              original field : scope status   :  %(scopsta)s
+              original field : expected result:  %(expresult)s
+              original field : step to reprod.:  %(stepreprod)s
+              """% {'assignee'       : str(issue_in.fields.assignee.name),  
+                    'created'        : str(issue_in.fields.created),
+                    'creator'        : str(issue_in.fields.creator.name),  
+                    'duedate'        : str(issue_in.fields.duedate),
+                    'reporter'       : str(issue_in.fields.reporter.name), 
+                    'resolution'     : str(issue_in.fields.resolution),
+                    'resolutiondate' : str(issue_in.fields.resolutiondate), 
+                    'status'         : str(issue_in.fields.status.name),
+                    'updated'        : issue_in.fields.updated, 
+                    'comment'        : custom_field_check(issue_in, 'customfield_10628'),
+                    'scopsta'        : custom_field_check(issue_in, 'customfield_10631'),
+                    'expresult'      : custom_field_check(issue_in, 'customfield_11433'),
+                    'stepreprod'     : custom_field_check(issue_in, 'customfield_11015')}
     return str(comment)
 
 @timeit
@@ -465,7 +490,11 @@ def copy_comments(jira_out, issue_in, issue_out):
     # issue_in.update()
     try:
         issue_out.update()
-        comments = [custom_isseue_comments(issue_in)]
+        try:
+          comments = [custom_isseue_comments(issue_in)]
+        except Exception as e:
+          print "Filed potenitally not avaiable", e
+          pass 
         # get the comments from the in issue then copies them to the other issue in the other jira instance
         issue_comments = ["%s added by %s"%(comment.body, comment.author.emailAddress) for comment in issue_in.fields.comment.comments]
         # Add a comment to the issue.
