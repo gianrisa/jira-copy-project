@@ -46,17 +46,22 @@ issuetype_map = {
                   'Question'             : 'Task',
                   'New Feature'          : 'Improvement',
                   'Design Issue'         : 'Defect',
+                  'Defect'               : 'Defect',
                   'Issue'                : 'Defect',
                   'Other'                : 'Task',
                   'Change Request'       : 'Improvement',
                   'Production Bug'       : 'Defect',
                   'Release'              : 'Task',
+                  'Request'              : 'Task',
                   'Story'                : 'User Story',
                   'Decision'             : 'Task',
                   'Data Quality'         : 'Defect',
                   'Performance'          : 'Defect',
+                  'Configuration Issue'  : 'Defect',
+                  'Bug-Sub task'         : 'Task',
                   'Change Request'       : 'Improvement',
                   'Functional defect'    : 'Defect',
+                  'Future Enhancement'   : 'Improvement',
                   'UI'                   : 'Defect',
                   'Requirement'          : 'User Story',
                   'Sub-task'             : 'Sub-task',
@@ -69,11 +74,12 @@ issuetype_map = {
                   'Story'                : 'User Story',
                   'Epic'                 : 'EPIC',
                   'Improvement'          : 'Improvement',
-                  'Change Request'       : 'Improvement',
                   'Task'                 : 'Task',
                   'Deployment Task'      : 'Task',
+                  'Risk'                 : 'Task',
                   'Missing Funtionality' : 'Improvement',
                   'Issue'                : 'Defect',
+                  'Usability'            : 'Defect',
                   'Scope Statement'      : 'Improvement'
                 }
 
@@ -439,7 +445,7 @@ def custom_field_check(issue_in, attrib):
       empty string.
   """
   if hasattr(issue_in.fields, attrib):
-    return str(clean(eval('issue.fields.%s'%str(attrib))))
+    return str(eval('issue_in.fields.%s'%str(attrib)))
   else:
     return str("")
 
