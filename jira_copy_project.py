@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#-*- coding: utf-8 -*-
 
 __author__ = 'risalgia'
 
@@ -21,14 +21,22 @@ from jira_secrets import secret_new, secret_old
 # 88     `8'     88 d8'          `8b 88           "Y88888P"
 
 issue_status =  {
-                  'closed'               : [4,2], # closed
-                  'reopened'             : [4,2,3],
-                  'inprogress'           : [4],
-                  'resolved'             : [5],
-                  'assigned'             : [4],   # inprogress
-                  'verified-closed'      : [4,2], # closed
-                  'deferred'             : [4],
-                  'resolved-invalid'     : [4]
+                  'closed'               : ['Reject'], # closed
+                  'reopened'             : ['Reject','Reopen Issue'],
+                  'inprogress'           : ['Accept','Ready for Development','Start Progress'],
+                  'resolved'             : ['Accept','Ready for Development','Start Progress','Reslove Issue'],
+                  'ux flow'              : ['Check Feasibility'],
+                  'ui design'            : ['Check Feasibility'],
+                  'story review'         : ['Accept'],
+                  'dev backlog'          : ['Accept','Wait for Feedback'],
+                  'ready for dev'        : ['Accept','Ready for Development'],
+                  'ios'                  : ['Accept','Ready for Development','Start Progress'],
+                  'android'              : ['Accept','Ready for Development','Start Progress'],
+                  'tech review'          : ['Accept','Ready for Development','Start Progress','Start Review'],
+                  'qa'                   : ['Accept','Ready for Development','Start Progress','Start Review','Ready To Test'],
+                  'approval'             : ['Accept','Ready for Development','Start Progress','Resolve Issue'],
+                  'release'              : ['Reject']
+
                 }
 
 linktype_map =  {
@@ -62,6 +70,7 @@ issuetype_map = {
                   'Change Request'       : 'Improvement',
                   'Functional defect'    : 'Defect',
                   'Future Enhancement'   : 'Improvement',
+                  'Functional Spec'      : 'Improvement',
                   'UI'                   : 'Defect',
                   'Requirement'          : 'User Story',
                   'Sub-task'             : 'Sub-task',
@@ -69,6 +78,7 @@ issuetype_map = {
                   'Technical Story'      : 'User Story',
                   'Technical task'       : 'Sub-task',
                   'Technical Task'       : 'Sub-task',
+                  'Technical Spec'       : 'User Story',
                   'Use Case'             : 'User Story',
                   'User Story'           : 'User Story',
                   'Story'                : 'User Story',
@@ -595,6 +605,21 @@ def copy_issuestatus(jira_in, jira_out, issue_in):
         print "Cannot change issue status :", e
 
 @timeit
+def copy_estimate(jira_in, jira_out, issue_in):
+  """This is the method used to copy the issue estimate from old to new, the estimate cold be the
+  original estimate or the custom field estimate this depends form the project"""
+  try:
+    if hasattr(issue_in.fields, 'customfield_11442'):
+      issue_out = jira_out.issue(issue_in.key)
+      issue_out.update(timetracking={'originalEstimate':'%sd'%issue_in.fields.customfield_11442})
+    else:
+      print "Issue has no estimate custom filed"  
+  except Exception, e:
+    print "Cannot copy the estimate :", e
+
+
+
+@timeit
 def copy_issueattribs(jira_in, jira_out, green_out, issues_in, options):
     """ This method is used to copy issue attributes, comments, attachments
         issuestatus and issuelinks.
@@ -608,6 +633,7 @@ def copy_issueattribs(jira_in, jira_out, green_out, issues_in, options):
             print "Copy issue attributes:", i_old.key
 
             if options.issuecomm:   copy_comments(jira_out, i_old, i_new)
+            if options.issueestim:  copy_estimate(jira_in, jira_out, i_old)
             if options.issueattach: copy_attachment(jira_in, jira_out, i_old)
             if options.issuelinks:  copy_issuelinks(jira_in, jira_out, i_old)
             if options.issuelinks:  copy_epiclink(jira_in, green_out, i_old)
@@ -715,6 +741,9 @@ def main():
 
     parser.add_option("--ic", "--issue-comm", help="copy issues comments",
                       action="store_true", dest="issuecomm", default=False)
+    
+    parser.add_option("--ie", "--issue-estim", help="copy issues estimation",
+                      action="store_true", dest="issueestim", default=False)
 
     parser.add_option("--ia", "--issue-attach", help="copy issues attachments",
                       action="store_true", dest="issueattach", default=False)
@@ -780,7 +809,7 @@ def main():
         copy_issues(j_old, j_new, j_project, issue_max_key, issues_old, options.inst, options.start)
     
     print banner("COPY ATTRIBUTES")
-    if options.issuestatus or options.issuelinks or options.issuecomm or options.issueattach:
+    if options.issuestatus or options.issuelinks or options.issuecomm or options.issueattach or options.issueestim:
         # iterate along the issues in the old project and copy comments attachment links and change
         # the issues status in the new jira
         copy_issueattribs(j_old, j_new, j_green, issues_old, options)
