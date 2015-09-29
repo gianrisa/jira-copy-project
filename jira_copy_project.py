@@ -21,6 +21,21 @@ from jira_secrets import secret_new, secret_old
 # 88     `8'     88 d8'          `8b 88           "Y88888P"
 
 issue_status =  {
+                  'open'                 : ['Accept','Ready for Development'], 
+                  'closed'               : ['Reject'],
+                  'reopened'             : ['Reject','Reopen Issue'],
+                  'inprogress'           : ['Accept','Ready for Development','Start Progress'],
+                  'resolved'             : ['Accept','Ready for Development','Start Progress','Resolve Issue'],
+                  'on hold'              : ['Accept','Wait for Feedback'],
+                  'approved'             : ['Accept'],
+                  'rejected'             : ['Accept','Ready for Development','Start Progress','Resolve Issue'],
+                  'review'               : ['Check Feasibility'],
+                  'retest'               : ['Accept','Ready for Development','Start Progress','Start Review','Ready To Test','Pass QA','Deploy Changes'],
+                  'verified'             : ['Accept','Ready for Development','Start Progress','Start Review','Ready To Test','Pass QA','Deploy Changes', 'Verify Deployment'],
+                  'code review'          : ['Accept','Ready for Development','Start Progress','Start Review']
+                }
+
+MOB_issue_status =  {
                   'closed'               : ['Reject'], # closed
                   'reopened'             : ['Reject','Reopen Issue'],
                   'inprogress'           : ['Accept','Ready for Development','Start Progress'],
@@ -36,7 +51,13 @@ issue_status =  {
                   'qa'                   : ['Accept','Ready for Development','Start Progress','Start Review','Ready To Test'],
                   'approval'             : ['Accept','Ready for Development','Start Progress','Resolve Issue'],
                   'release'              : ['Reject']
+                }
 
+PDM_issue_status =  {
+                  'closed'               : ['Close Issue'], # closed
+                  'reopened'             : ['Close Issue','Reopen Issue'],
+                  'in progress'          : ['Start Progress'],
+                  'resolved'             : ['Resolve Issue']
                 }
 
 linktype_map =  {
@@ -90,7 +111,9 @@ issuetype_map = {
                   'Missing Funtionality' : 'Improvement',
                   'Issue'                : 'Defect',
                   'Usability'            : 'Defect',
-                  'Scope Statement'      : 'Improvement'
+                  'Scope Statement'      : 'Improvement',
+                  'Change'               : 'Improvement',
+                  'Service Request'      : 'Task'
                 }
 
 priority_map =  {
@@ -194,8 +217,11 @@ def assignee(issue, jira_out, project):
     return {'name':str(username)}
                   
 def description(issue):
-    if issue.fields.description:
-        description = issue.fields.description
+    if issue.fields.description or custom_issue_description(issue):
+        tmp = []
+        tmp.append(issue.fields.description if issue.fields.description else "Description:")
+        tmp.append(custom_issue_description(issue))
+        description = '\n'.join(tmp)
         return str(clean(description))
     else:
         return "Empty description"
@@ -449,17 +475,35 @@ def copy_issues(jira_in, jira_out, project, issue_max_key, issues_old, inst, sta
             print "Skiping issue      : %s-%s"%(project,i)
 
 @timeit
-def custom_field_check(issue_in, attrib):
+def custom_field_check(issue_in, attrib, name=None):
   """ This method allows the user to get in the comments customfiled that are not common
       to all the project, in case the customfiled does not existe the method returns an
       empty string.
   """
   if hasattr(issue_in.fields, attrib):
-    return str(eval('issue_in.fields.%s'%str(attrib)))
+    value = str(eval('issue_in.fields.%s'%str(attrib)))
+    if name != None:
+      return str("%s : %s"%(name,value))
+    else:
+      return str(value)
   else:
     return str("")
 
-
+@timeit
+def custom_issue_description(issue_in):
+    """ This method is used to append to the description filed other custom fields, it can
+        be extended from the user
+    """
+    custom_description = """
+                  %(as_is)s
+                  %(to_be)s
+                  %(benefit_d)s
+                  %(benefit_c)s
+                  """% {'as_is'       : custom_field_check(issue_in, 'customfield_10598', 'As-is description'),
+                        'to_be'       : custom_field_check(issue_in, 'customfield_10599', 'To-be description'),
+                        'benefit_d'   : custom_field_check(issue_in, 'customfield_10600', 'Benefit description'),
+                        'benefit_c'   : custom_field_check(issue_in, 'customfield_10544.value', 'Benefit category')}
+    return str(custom_description)
 
 @timeit
 def custom_isseue_comments(issue_in):
